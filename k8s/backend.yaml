@@ -1,1 +1,35 @@
-
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: cicd-sandbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: YOUR_BACKEND_IMAGE_HERE:latest # 👈 替换为你真实的后端镜像名
+        ports:
+        - containerPort: 8085
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: cicd-sandbox
+spec:
+  selector:
+    app: backend
+  ports:
+    - protocol: TCP
+      port: 8085       # 集群内访问端口
+      targetPort: 8085
+      nodePort: 8085   # 👇 物理机对外暴露端口 (宿主机访问: 8085)
+  type: NodePort
