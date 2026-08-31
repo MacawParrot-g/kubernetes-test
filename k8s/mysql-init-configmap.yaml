@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-sql
+  namespace: cicd-sandbox
+data:
+  init.sql: |
+    CREATE USER IF NOT EXISTS 'remote_user'@'%' IDENTIFIED BY '12345678';
+    GRANT ALL PRIVILEGES ON *.* TO 'remote_user'@'%';
+    FLUSH PRIVILEGES;
