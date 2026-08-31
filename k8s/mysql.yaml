@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mysql
-  namespace: cicd-sandbox
+  namespace: k8s-test-env
 spec:
   replicas: 1
   selector:
@@ -18,13 +18,12 @@ spec:
         image: mysql:8.0
         env:
         - name: MYSQL_ROOT_PASSWORD
-          value: "root_password" # 设置 root 密码
+          value: "root_password"
         ports:
         - containerPort: 3306
         volumeMounts:
         - name: mysql-data
           mountPath: /var/lib/mysql
-        # 👇 关键修改：挂载初始化脚本到 Docker 镜像的 docker-entrypoint-initdb.d 目录
         - name: init-script
           mountPath: /docker-entrypoint-initdb.d/init.sql
           subPath: init.sql
@@ -33,7 +32,6 @@ spec:
         hostPath:
           path: /opt/k8s-data/mysql
           type: DirectoryOrCreate
-      # 使用 ConfigMap 存储初始化 SQL 脚本
       - name: init-script
         configMap:
           name: mysql-init-sql
@@ -42,13 +40,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mysql
-  namespace: cicd-sandbox
+  namespace: k8s-test-env
 spec:
   selector:
     app: mysql
   ports:
-    - protocol: TCP
-      port: 3304       # 集群内访问端口
+    - port: 3304
       targetPort: 3306
-      nodePort: 13304  # 👇 物理机对外暴露端口 (宿主机访问: 13304)
+      nodePort: 13304  # 宿主机访问端口
   type: NodePort
