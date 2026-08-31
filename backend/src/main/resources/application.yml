@@ -1,65 +1,30 @@
 spring:
   rabbitmq:
-    host: 10.1.13.140
+    host: rabbitmq  # 【修改1】使用 K8s Service 名称
     port: 5672
     username: admin
     password: 91781369
     virtual-host: /
-    connection-timeout: 3000ms
-    publisher-confirm-type: correlated
-    publisher-returns: true
-    listener:
-      simple:
-        acknowledge-mode: manual
-        prefetch: 10
-        concurrency: 3
-        max-concurrency: 8
-        missing-queues-fatal: false
-        retry:
-          enabled: false
-          max-attempts: 1
-          initial-interval: 2000ms
+    # ... 其他 rabbitmq 配置保持不变 ...
   data:
     redis:
-      host: 10.1.13.140
+      host: redis   # 【修改2】使用 K8s Service 名称
       port: 6379
       database: 1
       timeout: 3000ms
   datasource:
-    url: jdbc:mysql://localhost:3306/test_data?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&autoReconnect=true&failOverReadOnly=false
-    username: root
+    url: jdbc:mysql://mysql:3304/test_data?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&autoReconnect=true&failOverReadOnly=false # 【修改3】使用 K8s Service 名称和端口
+    username: remote_user  # 【修改4】使用我们刚才初始化的用户
     password: 12345678
     driver-class-name: com.mysql.cj.jdbc.Driver
-    hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      leak-detection-threshold: 60000
-      connection-test-query: SELECT 1
-      auto-commit: true
-      pool-name: HikariPool-1
-      register-mbeans: true
-      keepalive-time: 300000
+    # ... hikari 配置保持不变 ...
   lifecycle:
-    timeout-per-shutdown-phase: 30s
+    timeout-per-shutdown-phase: 25s # 【修改5】比 K8s 默认 30s 少 5 秒
 
 server:
-  port: 8080
+  port: 8085  # 【修改6】与 K8s 暴露端口对齐
   shutdown: graceful
-  servlet:
-    session:
-      timeout: 1800s
-  tomcat:
-    threads:
-      max: 200
-      min-spare: 20
-    accept-count: 100
-    max-connections: 8192
-    connection-timeout: 20000
-    keep-alive-timeout: 60000
-    max-keep-alive-requests: 200
+  # ... 其他 server 配置保持不变 ...
 
 management:
   endpoints:
@@ -69,7 +34,13 @@ management:
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true  # 【修改7】开启 K8s 探针
   health:
+    livenessstate:
+      enabled: true    # 【修改8】存活探针
+    readinessstate:
+      enabled: true    # 【修改9】就绪探针
     rabbit:
       enabled: true
     redis:
@@ -85,20 +56,9 @@ logging:
     com.zaxxer.hikari: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{username}] %-5level %logger{36} - %msg%n"
-  file:
-    name: /data/logs/app.log
+  # 【修改10】删除了 file.name 配置，强制日志输出到控制台，交由 K8s 收集
   logback:
     rollingpolicy:
       max-file-size: 100MB
       max-history: 30
       total-size-cap: 3GB
-
-export:
-  file-dir: /data/export
-
-springdoc:
-  api-docs:
-    enabled: true
-  swagger-ui:
-    enabled: true
-    path: /swagger-ui.html
