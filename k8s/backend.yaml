@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend
-  namespace: cicd-sandbox
+  namespace: k8s-test-env
 spec:
   replicas: 1
   selector:
@@ -15,21 +15,33 @@ spec:
     spec:
       containers:
       - name: backend
-        image: YOUR_BACKEND_IMAGE_HERE:latest # 👈 替换为你真实的后端镜像名
+        image: myapp-backend:latest
         ports:
         - containerPort: 8085
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "prod"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:mysql://mysql:3304/test_data?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true"
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "remote_user"
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: "12345678"
+        - name: SPRING_REDIS_HOST
+          value: "redis"
+        - name: SPRING_REDIS_PORT
+          value: "6378"
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: backend
-  namespace: cicd-sandbox
+  namespace: k8s-test-env
 spec:
   selector:
     app: backend
   ports:
-    - protocol: TCP
-      port: 8085       # 集群内访问端口
+    - port: 8085
       targetPort: 8085
-      nodePort: 8085   # 👇 物理机对外暴露端口 (宿主机访问: 8085)
+      nodePort: 8085   # 宿主机访问端口
   type: NodePort
