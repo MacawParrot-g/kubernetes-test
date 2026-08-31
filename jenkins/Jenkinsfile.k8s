@@ -1,1 +1,77 @@
-0
+pipeline {
+    agent any
+
+    environment {
+        BACKEND_IMAGE = 'myapp-backend:latest'
+        NAMESPACE = 'k8s-test-env'
+    }
+
+    tools {
+        nodejs 'nodejs'
+    }
+
+    stages {
+        stage('1. 拉取代码') {
+            steps {
+                checkout scm
+                echo '>>> 代码拉取完成'
+            }
+        }
+
+        stage('2. 后端构建与镜像打包') {
+            steps {
+                dir('backend') {
+                    echo '>>> 开始编译后端代码...'
+                    sh 'mvn clean package -DskipTests -U'
+                    
+                    echo '>>> 构建 Docker 镜像...'
+                    sh "docker build --no-cache -t ${BACKEND_IMAGE} ."
+                    
+                    // 注意：Minikube 默认使用本地 Docker，所以无需 docker push
+                    // 如果是多节点集群，请在此处添加 docker push 命令
+                }
+            }
+        }
+
+        stage('3. 前端构建') {
+            steps {
+                dir('frontend') {
+                    echo '>>> 开始安装前端依赖并构建...'
+                    sh 'npm install'
+                    sh 'npm run build'
+                }
+            }
+        }
+
+        stage('4. K8s 部署与重建') {
+            steps {
+                // 1. 确保命名空间存在
+                sh "minikube kubectl -- apply -f k8s/namespace.yaml"
+
+                // 2. 部署有状态服务 (MySQL & Redis & RabbitMQ)
+                sh "minikube kubectl -- apply -f k8s/mysql-init-configmap.yaml"
+                sh "minikube kubectl -- apply -f k8s/mysql.yaml"
+                sh "minikube kubectl -- apply -f k8s/redis.yaml"
+                sh "minikube kubectl -- apply -f k8s/rabbitmq.yaml"
+
+                // 3. 强制重建无状态服务 (Backend)
+                sh "minikube kubectl -- apply -f k8s/backend.yaml"
+                sh "minikube kubectl -- rollout restart deployment/backend -n ${NAMESPACE}"
+
+                // 4. 前端部署：将 dist 目录打包为 ConfigMap 并更新 Nginx
+                sh "minikube kubectl -- create configmap nginx-dist --from-file=frontend/dist -n ${NAMESPACE} --dry-run=client -o yaml | minikube kubectl -- apply -f -"
+                
+                // 更新 Nginx 部署配置，挂载最新的 ConfigMap
+                sh "minikube kubectl -- patch deployment nginx -n ${NAMESPACE} -p '{\"spec\":{\"template\":{\"spec\":{\"volumes\":[{\"name\":\"nginx-dist\",\"configMap\":{\"name\":\"nginx-dist\"}}]}}}}'"
+                sh "minikube kubectl -- rollout restart deployment/nginx -n ${NAMESPACE}"
+            }
+        }
+    }
+
+    post {
+        always {
+            echo '>>> 清理 Jenkins 工作区...'
+            cleanWs()
+        }
+    }
+}
