@@ -1,1 +1,43 @@
-
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: cicd-sandbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+      volumes:
+      - name: redis-data
+        hostPath:
+          path: /opt/k8s-data/redis
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: cicd-sandbox
+spec:
+  selector:
+    app: redis
+  ports:
+    - protocol: TCP
+      port: 6378       # 集群内访问端口
+      targetPort: 6379
+      nodePort: 16378  # 👇 物理机对外暴露端口 (宿主机访问: 16378)
+  type: NodePort
